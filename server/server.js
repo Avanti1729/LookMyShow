@@ -7,7 +7,7 @@ import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js";
 const app = express();
 const port = 3000;
-await connectDB;
+await connectDB();
 // Middleware
 app.use(express.json());
 app.use(cors());
