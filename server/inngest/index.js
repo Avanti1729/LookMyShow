@@ -6,9 +6,15 @@ export const inngest = new Inngest({ id: "movie-ticket-booking" });
 
 // Helper to ensure DB connection before DB ops
 async function ensureDBConnected() {
-  // Mongoose connection states: 1 = connected
-  if (User.db.readyState !== 1) {
-    await connectDB();
+  try {
+    // Mongoose connection states: 1 = connected
+    if (User.db.readyState !== 1) {
+      await connectDB();
+      console.log("✅ Database connected.");
+    }
+  } catch (error) {
+    console.error("❌ Error ensuring DB connection:", error);
+    throw error; // Propagate the error to the calling function
   }
 }
 
@@ -19,16 +25,26 @@ const syncUserCreation = inngest.createFunction(
   async ({ event, step }) => {
     await ensureDBConnected();
 
-    console.log("🔥 Received user.created event:", event.data);
+    console.log(
+      `🔥 Received user.created event (ID: ${event.id}):`,
+      event.data
+    );
 
     const { id, first_name, last_name, email_addresses, image_url } =
       event.data;
+
+    // Validate required fields
+    if (!id || !email_addresses || email_addresses.length === 0) {
+      throw new Error(
+        "Missing required fields (id or email) in user creation event"
+      );
+    }
 
     const userData = {
       _id: id,
       email: email_addresses?.[0]?.email_address || "noemail@example.com",
       name: `${first_name} ${last_name}`,
-      image: image_url,
+      image: image_url || "https://example.com/default-avatar.png", // Default image URL
     };
 
     try {
@@ -52,7 +68,10 @@ const syncUserDeletion = inngest.createFunction(
   async ({ event, step }) => {
     await ensureDBConnected();
 
-    console.log("🔥 Received user.deleted event:", event.data);
+    console.log(
+      `🔥 Received user.deleted event (ID: ${event.id}):`,
+      event.data
+    );
 
     try {
       const result = await step.run("delete-user", async () => {
@@ -75,15 +94,25 @@ const syncUserUpdation = inngest.createFunction(
   async ({ event, step }) => {
     await ensureDBConnected();
 
-    console.log("🔥 Received user.updated event:", event.data);
+    console.log(
+      `🔥 Received user.updated event (ID: ${event.id}):`,
+      event.data
+    );
 
     const { id, first_name, last_name, email_addresses, image_url } =
       event.data;
 
+    // Validate required fields
+    if (!id || !email_addresses || email_addresses.length === 0) {
+      throw new Error(
+        "Missing required fields (id or email) in user update event"
+      );
+    }
+
     const updatedUserData = {
       email: email_addresses?.[0]?.email_address || "noemail@example.com",
       name: `${first_name} ${last_name}`,
-      image: image_url,
+      image: image_url || "https://example.com/default-avatar.png", // Default image URL
     };
 
     try {
