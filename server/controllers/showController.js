@@ -1,30 +1,151 @@
 import axios from "axios";
+import Movie from "../models/Movie.js";
+import Show from "../models/Show.js";
 
+// ✅ Fetch Now Playing Movies from TMDB API
 export const getNowPlayingMovies = async (req, res) => {
   try {
-    // Send a request to The Movie DB API for now-playing movies
     const { data } = await axios.get(
       "https://api.themoviedb.org/3/movie/now_playing",
       {
-        headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` }, // Ensure the API key is in your .env file
+        headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
       }
     );
 
-    // Extract movie data
-    const movies = data.results;
-
-    // Return successful response with the movie data
-    return res.json({ success: true, movies });
+    return res.json({ success: true, movies: data.results });
   } catch (error) {
-    // Log error for debugging
     console.error("Error fetching now playing movies:", error);
-
-    // Provide a more user-friendly error response
     return res.status(500).json({
       success: false,
       message: error.response
         ? error.response.data.status_message
         : error.message,
     });
+  }
+};
+
+// ✅ Add a Show for a Movie
+export const addShow = async (req, res) => {
+  try {
+    const { movieId, showsInput, showPrice } = req.body;
+
+    if (!movieId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Movie ID is required" });
+    }
+
+    if (!Array.isArray(showsInput) || showsInput.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Shows input is required" });
+    }
+
+    let movie = await Movie.findById(movieId);
+
+    // If movie doesn't exist, fetch from TMDB
+    if (!movie) {
+      const [movieDetailsResponse, movieCreditsResponse] = await Promise.all([
+        axios.get(`https://api.themoviedb.org/3/movie/${movieId}`, {
+          headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+        }),
+        axios.get(`https://api.themoviedb.org/3/movie/${movieId}/credits`, {
+          headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+        }),
+      ]);
+
+      const movieApiData = movieDetailsResponse.data;
+      const movieCreditsData = movieCreditsResponse.data;
+
+      const movieDetails = {
+        _id: movieId,
+        title: movieApiData.title,
+        overview: movieApiData.overview,
+        poster_path: movieApiData.poster_path,
+        backdrop_path: movieApiData.backdrop_path,
+        genres: movieApiData.genres.map((g) => g.name),
+        casts: movieCreditsData.cast,
+        release_date: movieApiData.release_date,
+        original_language: movieApiData.original_language,
+        tagline: movieApiData.tagline || "",
+        vote_average: movieApiData.vote_average,
+        runtime: movieApiData.runtime,
+      };
+
+      movie = await Movie.create(movieDetails);
+    }
+
+    // Prepare shows
+    const showsToCreate = [];
+    showsInput.forEach((show) => {
+      const showDate = show.date;
+      show.time.forEach((time) => {
+        const dateTimeString = `${showDate}T${time}`;
+        showsToCreate.push({
+          movie: movieId,
+          showDateTime: new Date(dateTimeString),
+          showPrice,
+          occupiedSeats: {},
+        });
+      });
+    });
+
+    if (showsToCreate.length > 0) {
+      await Show.insertMany(showsToCreate);
+      return res.json({ success: true, message: "Show Added Successfully" });
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, message: "No valid shows to add" });
+    }
+  } catch (error) {
+    console.error("Error adding show:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.response
+        ? error.response.data.status_message
+        : error.message,
+    });
+  }
+};
+
+// ✅ Get ALL Shows with timings + movie details
+export const getShows = async (req, res) => {
+  try {
+    const shows = await Show.find({ showDateTime: { $gte: new Date() } })
+      .populate("movie")
+      .sort({ showDateTime: 1 });
+
+    res.json({ success: true, shows });
+  } catch (error) {
+    console.error(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// ✅ Get Shows for a specific movie (grouped by date)
+export const getShow = async (req, res) => {
+  try {
+    const { movieId } = req.params;
+    const shows = await Show.find({
+      movie: movieId,
+      showDateTime: { $gte: new Date() },
+    });
+
+    const movie = await Movie.findById(movieId);
+    const dateTime = {};
+
+    shows.forEach((show) => {
+      const date = show.showDateTime.toISOString().split("T")[0];
+      if (!dateTime[date]) {
+        dateTime[date] = [];
+      }
+      dateTime[date].push({ time: show.showDateTime, showId: show._id });
+    });
+
+    res.json({ success: true, movie, dateTime });
+  } catch (error) {
+    console.error(error);
+    res.json({ success: false, message: error.message });
   }
 };
