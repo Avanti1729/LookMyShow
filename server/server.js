@@ -7,6 +7,8 @@ import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js";
 import User from "./models/User.js"; // ✅ import your User model
 import showRouter from "./routes/showRoutes.js";
+import bookingRouter from "./routes/bookingRoutes.js";
+import adminRouter from "./routes/adminRoutes.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,13 +29,11 @@ app.use(clerkMiddleware());
 
 // ✅ Root route
 app.get("/", (req, res) => res.send("Server is Live!"));
-app.get("/hello-world", (req, res) => {
-  res.send("Hello World!");
-});
-
 // ✅ Inngest event handler route
 app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/show", showRouter); // Changed from "/api/show" to "/show"
+app.use("/api/booking", bookingRouter);
+app.use("/api/admin", adminRouter);
 
 // ✅ TEST route to manually create a user in MongoDB (only in development)
 if (process.env.NODE_ENV === "development") {
