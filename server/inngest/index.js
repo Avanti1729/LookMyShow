@@ -1,6 +1,7 @@
 import { Inngest } from "inngest";
 import User from "../models/User.js";
 import connectDB from "../configs/db.js";
+import sendEmail from "../configs/nodeMailer.js";
 
 export const inngest = new Inngest({ id: "movie-ticket-booking" });
 
@@ -129,4 +130,28 @@ const syncUserUpdation = inngest.createFunction(
   }
 );
 
-export const functions = [syncUserCreation, syncUserDeletion, syncUserUpdation];
+const sendBookingConfirmationEmail = inngest.createFunction(
+  { id: "send-booking-confirmation-mail" },
+  { event: "app/show.booked" },
+  async ({ event, step }) => {
+    const { bookingId } = event.data;
+    const booking = await Booking.findById(bookingId)
+      .populate({
+        path: "show",
+        populate: { path: "movie", model: "Movie" },
+      })
+      .populate("user");
+    await sendEmail({
+      to: booking.user.email,
+      subject: `Payment Confirmation: "${booking.show.movie.title}" booked!`,
+      body: `<p>Your Booking for the show  ${booking.show.movie.title}</p>`,
+    });
+  }
+);
+
+export const functions = [
+  syncUserCreation,
+  syncUserDeletion,
+  syncUserUpdation,
+  sendBookingConfirmationEmail,
+];
