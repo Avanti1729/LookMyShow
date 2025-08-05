@@ -16,7 +16,8 @@ const movieSchema = new mongoose.Schema(
       type: [
         {
           name: { type: String, required: true }, // Cast name
-          character: { type: String, required: true }, // Character played by the cast
+          character: { type: String, required: true },
+          profile_path: { type: String }, // Character played by the cast
         },
       ],
       required: true,

@@ -143,6 +143,9 @@ export const getShow = async (req, res) => {
       dateTime[date].push({ time: show.showDateTime, showId: show._id });
     });
 
+    console.log("🎬 Movie Data:", movie?.title);
+    console.log("🎭 Cast sample:", movie?.casts?.slice(0, 5));
+
     res.json({ success: true, movie, dateTime });
   } catch (error) {
     console.error(error);

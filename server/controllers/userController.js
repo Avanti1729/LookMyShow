@@ -1,5 +1,6 @@
 import { clerkClient } from "@clerk/express";
 import Booking from "../models/Booking.js";
+import Movie from "../models/Movie.js";
 export const getUserBookings = async (req, res) => {
   try {
     const user = req.auth().userId;
@@ -9,6 +10,7 @@ export const getUserBookings = async (req, res) => {
         populate: { path: "movie" },
       })
       .sort({ createdAt: -1 });
+    console.log(JSON.stringify(bookings, null, 2));
     res.json({ success: true, bookings });
   } catch (error) {
     console.error(error.message);
@@ -42,7 +44,7 @@ export const updateFavorite = async (req, res) => {
 
 export const getFavorites = async (req, res) => {
   try {
-    const user = await clerkClient.users.getUser(req.aut().userId);
+    const user = await clerkClient.users.getUser(req.auth().userId);
     const favorites = user.privateMetadata.favorites;
     const movies = await Movie.find({ _id: { $in: favorites } });
     res.json({ success: true, movies });
